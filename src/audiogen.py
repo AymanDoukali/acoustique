@@ -90,7 +90,7 @@ class audiogen:
         segments_info = []
 
         while current_time < target_duration_sec:
-            active_idx = speaker_idx % 3
+            active_idx = speaker_idx % n_speakers
             speaker_id = selected_speakers[active_idx]
             speaker_path = os.path.join(self.raw_path, speaker_id)
 
@@ -182,7 +182,7 @@ class audiogen:
 
 def generate_batch(n_gen=1, target_duration_sec=60.0, n_speakers=3):
     """Génère un lot de pistes audio synchronisées."""
-    PATH = Path(f"data/generated/speech/batch{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    PATH = Path(f"data/generated/speech/batch_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}")
     gen_audio = audiogen(output_base_dir = PATH)
     speakers = gen_audio.get_random_speakers(N_SPEAKERS)
     track_ids = []
@@ -196,4 +196,5 @@ def generate_batch(n_gen=1, target_duration_sec=60.0, n_speakers=3):
 if __name__ == "__main__":
     #audio_generator = audiogen()
     #track_id = audio_generator.generate()
-    print(generate_batch(n_gen=10, target_duration_sec=60.0, n_speakers=3))
+    print(generate_batch(n_gen=60, target_duration_sec=60.0, n_speakers=3))
+    print(generate_batch(n_gen=60, target_duration_sec=60.0, n_speakers=2))
