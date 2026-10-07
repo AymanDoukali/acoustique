@@ -7,7 +7,6 @@ class GenerationResultat:
                  absorption=0.3, max_order=10, noise_gain=0.1):
         """
         signals: liste de signaux (numpy arrays) à mélanger, un par personne, sans recouvrement temporel
-
         noise_signal: signal de bruit à ajouter (numpy array), si on en veut un, qui doit faire la même longueur que les signaux
         fs: fréquence d'échantillonnage
         absorption: coefficient d'absorption des murs
