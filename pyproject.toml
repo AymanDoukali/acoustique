@@ -3,6 +3,7 @@ name = "acoustique"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "librosa>=1.0.0",
     "matplotlib>=3.11.2",
     "pyroomacoustics>=0.10.1",
 ]
