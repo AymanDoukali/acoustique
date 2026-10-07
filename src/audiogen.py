@@ -7,6 +7,10 @@ import librosa
 import numpy as np
 import soundfile as sf
 from pathlib import Path
+import datetime
+
+
+N_SPEAKERS = 10
 
 
 class audiogen:
@@ -34,7 +38,20 @@ class audiogen:
                         transcripts[utt_id] = text
         return transcripts
 
-    def generate(self, target_duration_sec=60.0, custom_track_id=None):
+    def get_random_speakers(self, num_speakers=10):
+        """Sélectionne aléatoirement un nombre donné de speakers à partir du répertoire raw_path."""
+        speaker_dirs = [
+            d
+            for d in os.listdir(self.raw_path)
+            if os.path.isdir(os.path.join(self.raw_path, d))
+        ]
+        if len(speaker_dirs) < num_speakers:
+            raise ValueError(
+                f"Pas assez de speakers dans {self.raw_path} (minimum {num_speakers} requis)."
+            )
+        return random.sample(speaker_dirs, num_speakers)
+    
+    def generate(self, target_duration_sec=60.0, n_speakers = 3, speakers=None, custom_track_id=None, normalize_audio=True):
         """Génère 3 fichiers audio de 1 minute synchronisés.
 
         Une seule personne parle à la fois : la piste du speaker actif contient de l'audio,
@@ -43,6 +60,9 @@ class audiogen:
         track_id = custom_track_id or f"track_{uuid.uuid4().hex[:8]}"
         track_dir = os.path.join(self.output_base_dir, track_id)
         os.makedirs(track_dir, exist_ok=True)
+    
+        if speakers is None:
+            speakers = self.get_random_speakers(n_speakers)
 
         speaker_dirs = [
             d
@@ -50,12 +70,14 @@ class audiogen:
             if os.path.isdir(os.path.join(self.raw_path, d))
         ]
 
-        if len(speaker_dirs) < 3:
-            raise ValueError(
-                f"Pas assez de speakers dans {self.raw_path} (minimum 3 requis)."
-            )
+        for speaker in speakers:
+            if speaker not in speaker_dirs:
+                raise ValueError(
+                    f"Le speaker {speaker} n'existe pas dans {self.raw_path}."
+                )
 
-        selected_speakers = random.sample(speaker_dirs, 3)
+        selected_speakers = random.sample(speakers, n_speakers)
+
         sr = 16000
         total_samples = int(target_duration_sec * sr)
 
@@ -124,6 +146,10 @@ class audiogen:
         ):
             file_name = f"speaker_{i}_{speaker_id}.wav"
             wav_path = os.path.join(track_dir, file_name)
+
+            if normalize_audio:
+                track_signal = librosa.util.normalize(track_signal)
+
             sf.write(wav_path, track_signal, sr)
 
             files_metadata.append(
@@ -140,7 +166,9 @@ class audiogen:
         json_data = {
             "track_id": track_id,
             "total_duration_sec": target_duration_sec,
-            "speakers_count": 3,
+            "speakers_count": len(selected_speakers),
+            "speakers": selected_speakers,
+            "normalize_audio": normalize_audio,
             "audios": files_metadata,
             "timeline_segments": segments_info,
         }
@@ -150,6 +178,22 @@ class audiogen:
 
         return track_id, audio_tracks
 
+
+
+def generate_batch(n_gen=1, target_duration_sec=60.0, n_speakers=3):
+    """Génère un lot de pistes audio synchronisées."""
+    PATH = Path(f"data/generated/speech/batch{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    gen_audio = audiogen(output_base_dir = PATH)
+    speakers = gen_audio.get_random_speakers(N_SPEAKERS)
+    track_ids = []
+    for _ in range(n_gen):
+        track_id, _ = gen_audio.generate(
+            target_duration_sec=target_duration_sec, n_speakers=n_speakers, speakers=speakers
+        )
+        track_ids.append(track_id)
+    return track_ids
+    
 if __name__ == "__main__":
-    audio_generator = audiogen()
-    track_id = audio_generator.generate()
+    #audio_generator = audiogen()
+    #track_id = audio_generator.generate()
+    print(generate_batch(n_gen=10, target_duration_sec=60.0, n_speakers=3))
