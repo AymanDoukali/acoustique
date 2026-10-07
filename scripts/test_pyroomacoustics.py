@@ -1,21 +1,75 @@
-import numpy as np
+"""
+This sample program demonstrate how to import a model from an STL file.
+Currently, the materials need to be set in the program which is not very practical
+when different walls have different materials.
+
+The STL file was kindly provided by Diego Di Carlo (@Chutlhu).
+"""
+
+import argparse
+import os
+from pathlib import Path
+
 import matplotlib.pyplot as plt
+import numpy as np
+from mpl_toolkits import mplot3d
+
 import pyroomacoustics as pra
 
-# Create a 4 by 6 metres shoe box room
-room = pra.ShoeBox([4,6])
+try:
+    from stl import mesh
+except ImportError as err:
+    print(
+        "The numpy-stl package is required for this example. "
+        "Install it with `pip install numpy-stl`"
+    )
+    raise err
 
-# Add a source somewhere in the room
-room.add_source([2.5, 4.5])
+default_stl_path = Path(__file__).parent / "data/INRIA_MUSIS.stl"
 
-# Create a linear array beamformer with 4 microphones
-# with angle 0 degrees and inter mic distance 10 cm
-R = pra.linear_2D_array([2, 1.5], 4, 0, 0.1)
-room.add_microphone_array(pra.Beamformer(R, room.fs))
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Basic room from STL file example")
+    parser.add_argument(
+        "--file", type=str, default=default_stl_path, help="Path to STL file"
+    )
+    args = parser.parse_args()
 
-# Now compute the delay and sum weights for the beamformer
-room.mic_array.rake_delay_and_sum_weights(room.sources[0][:1])
+    material = pra.Material(energy_absorption=0.2, scattering=0.1)
 
-# plot the room and resulting beamformer
-room.plot(freq=[1000, 2000, 4000, 8000], img_order=0)
-plt.show()
+    # with numpy-stl
+    the_mesh = mesh.Mesh.from_file(args.file)
+    ntriang, nvec, npts = the_mesh.vectors.shape
+    size_reduc_factor = 500.0  # to get a realistic room size (not 3km)
+
+    # create one wall per triangle
+    walls = []
+    for w in range(ntriang):
+        walls.append(
+            pra.wall_factory(
+                the_mesh.vectors[w].T / size_reduc_factor,
+                material.energy_absorption["coeffs"],
+                material.scattering["coeffs"],
+            )
+        )
+
+    room = (
+        pra.Room(
+            walls,
+            fs=16000,
+            max_order=3,
+            ray_tracing=True,
+            air_absorption=True,
+        )
+        .add_source([-2.0, 2.0, 1.8])
+        .add_microphone_array(np.c_[[-6.5, 8.5, 3 + 0.1], [-6.5, 8.1, 3 + 0.1]])
+    )
+
+    # compute the rir
+    room.image_source_model()
+    room.ray_tracing()
+    room.compute_rir()
+    room.plot_rir()
+
+    # show the room
+    room.plot(img_order=1)
+    plt.show()

@@ -19,7 +19,10 @@ mics = simu.get_result()
 
 track_dir = os.path.join(gen_audio.output_base_dir, track_id)
 mics = mics / np.abs(mics).max()  
-sf.write(os.path.join(track_dir, "mixture_3mics.wav"), mics.T, FS) 
+for i in range(mics.shape[0]):
+    sf.write(os.path.join(track_dir, f"mixture_mic_{i+1}.wav"), mics[i], FS)
+
+sf.write(os.path.join(track_dir, "noise.wav"), noise, FS)
 
 plt.figure()
 plt.plot(mics[0], label='Microphone 1')
