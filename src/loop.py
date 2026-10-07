@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from audiogen import audiogen                   
 from generationresultat import GenerationResultat  
 import random
-
+import json
 
 FS = 16000
 # 10 speakers signals and choose among them
@@ -29,7 +29,7 @@ for absorbtion in absorbtions:
             if not os.path.exists(case_dir):
                 os.mkdir(case_dir)
             for j in range(n_sim):
-                track_ids, signals = gen_audio.generate(target_duration_sec=60.0, n_speakers=n_speaker)
+                track_id, signals = gen_audio.generate(target_duration_sec=60.0, n_speakers=n_speaker)
                 nois_signal = None if noise == False else NOISE
                 simu = GenerationResultat(signals, noise_signal=nois_signal, fs=FS, noise_gain=noise_gain, absorption=absorbtion)
                 mics = simu.get_result()         
@@ -40,5 +40,17 @@ for absorbtion in absorbtions:
                 mics = mics / np.abs(mics).max()  
                 for i in range(mics.shape[0]):
                     sf.write(os.path.join(track_dir, f"mixture_mic_{i+1}.wav"), mics[i], FS)
+
+                metadata_path = os.path.join(track_dir, "metadata.json")
+                json_data = {
+                    "track_id": track_id,
+                    "absorbtion": absorbtion,
+                    "speakers_count": n_speaker,
+                    "noise": noise,
+
+                }
+        
+                with open(metadata_path, "w", encoding="utf-8") as f:
+                    json.dump(json_data, f, indent=4, ensure_ascii=False)
             case_ += 1
 
