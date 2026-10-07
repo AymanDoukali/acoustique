@@ -6,17 +6,21 @@ import uuid
 import librosa
 import numpy as np
 import soundfile as sf
+from pathlib import Path
 
 
 class audiogen:
 
     def __init__(
         self,
-        raw_path="data/raw/LibriSpeech/test-clean",
-        output_base_dir="data/generated/speech",
+        raw_path=Path("data/raw/LibriSpeech/test-clean"),
+        output_base_dir=Path("data/generated/speech"),
     ):
-        self.raw_path = raw_path
-        self.output_base_dir = output_base_dir
+        # pathlib gère les séparateurs de chemins sous Linux et Windows.
+        self.raw_path = Path(raw_path)
+        self.output_base_dir = Path(output_base_dir)
+        self.raw_path.mkdir(parents=True, exist_ok=True)
+        self.output_base_dir.mkdir(parents=True, exist_ok=True)
 
     def _load_transcripts(self, trans_file_path):
         """Lit un fichier .trans.txt et extrait un dictionnaire {id_audio: texte}"""
