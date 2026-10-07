@@ -42,3 +42,7 @@ uv add <package>
 
 Then commit the updated `pyproject.toml` and `uv.lock`. Collaborators just run `uv sync` after pulling.
 Do not commit `.venv/`.
+
+# Warning
+
+You have to install LibriSpeech in data/raw/
