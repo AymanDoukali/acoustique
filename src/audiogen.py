@@ -25,7 +25,7 @@ class audiogen:
         self.output_base_dir = Path(output_base_dir)
         self.raw_path.mkdir(parents=True, exist_ok=True)
         self.output_base_dir.mkdir(parents=True, exist_ok=True)
-
+        self.speakers = self.get_random_speakers(10)
     def _load_transcripts(self, trans_file_path):
         """Lit un fichier .trans.txt et extrait un dictionnaire {id_audio: texte}"""
         transcripts = {}
@@ -51,7 +51,7 @@ class audiogen:
             )
         return random.sample(speaker_dirs, num_speakers)
     
-    def generate(self, target_duration_sec=60.0, n_speakers = 3, speakers=None, custom_track_id=None, normalize_audio=True):
+    def generate(self, target_duration_sec=60.0, n_speakers = 3, custom_track_id=None, normalize_audio=True):
         """Génère 3 fichiers audio de 1 minute synchronisés.
 
         Une seule personne parle à la fois : la piste du speaker actif contient de l'audio,
@@ -61,8 +61,6 @@ class audiogen:
         track_dir = os.path.join(self.output_base_dir, track_id)
         os.makedirs(track_dir, exist_ok=True)
     
-        if speakers is None:
-            speakers = self.get_random_speakers(n_speakers)
 
         speaker_dirs = [
             d
@@ -70,13 +68,13 @@ class audiogen:
             if os.path.isdir(os.path.join(self.raw_path, d))
         ]
 
-        for speaker in speakers:
+        for speaker in self.speakers:
             if speaker not in speaker_dirs:
                 raise ValueError(
                     f"Le speaker {speaker} n'existe pas dans {self.raw_path}."
                 )
 
-        selected_speakers = random.sample(speakers, n_speakers)
+        selected_speakers = random.sample(self.speakers, n_speakers)
 
         sr = 16000
         total_samples = int(target_duration_sec * sr)
