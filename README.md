@@ -46,3 +46,5 @@ Do not commit `.venv/`.
 # Warning
 
 You have to install LibriSpeech in data/raw/
+at https://www.openslr.org/12
+
