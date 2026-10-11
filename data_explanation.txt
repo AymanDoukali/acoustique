@@ -1,0 +1,258 @@
+DATASET GENERATION EXPLANATION
+==============================
+
+This document describes the dataset generated in data/generated/final/.
+The entry point is src/main.py. It calls genrate_data() from
+src/data_generator.py.
+
+
+1. GENERAL PURPOSE
+------------------
+
+The program creates simulated room-acoustic recordings. For every
+simulation, it:
+
+1. Selects speech recordings from LibriSpeech test-clean.
+2. Builds two or three synchronized speaker tracks.
+3. Optionally adds a fan-noise signal.
+4. Simulates the propagation of these signals in a 4 m x 6 m room.
+5. Records the result with three virtual microphones.
+6. Saves the source tracks, the noise, the microphone mixtures, and metadata.
+
+The default generation uses:
+
+- sample rate: 16,000 Hz;
+- duration: 60 seconds;
+- absorption coefficients: 0.1, 0.2, and 0.3;
+- noise gain: 0.1;
+- 10 simulations per configuration;
+- 2 or 3 speakers;
+- noise enabled or disabled.
+
+The fan noise is generated once before the configuration loops. It is then
+reused for every simulation for which noise is enabled. The speech tracks are
+generated independently for each simulation.
+
+
+2. HOW THE LOOP WORKS
+---------------------
+
+The generation code contains three nested configuration loops:
+
+    for absorption in [0.1, 0.2, 0.3]:
+        for noise in [True, False]:
+            for n_speaker in [2, 3]:
+                generate 10 simulations
+
+For each combination, a directory named case_N is created. The case number
+is incremented after all 10 simulations for that configuration have been
+generated.
+
+The resulting case order is:
+
+    case_0: absorption 0.1, noise enabled,  2 speakers
+    case_1: absorption 0.1, noise enabled,  3 speakers
+    case_2: absorption 0.1, noise disabled, 2 speakers
+    case_3: absorption 0.1, noise disabled, 3 speakers
+    case_4: absorption 0.2, noise enabled,  2 speakers
+    case_5: absorption 0.2, noise enabled,  3 speakers
+    case_6: absorption 0.2, noise disabled, 2 speakers
+    case_7: absorption 0.2, noise disabled, 3 speakers
+    case_8: absorption 0.3, noise enabled,  2 speakers
+    case_9: absorption 0.3, noise enabled,  3 speakers
+    case_10: absorption 0.3, noise disabled, 2 speakers
+    case_11: absorption 0.3, noise disabled, 3 speakers
+
+Inside each case, the inner loop creates:
+
+    sim_0, sim_1, ..., sim_9
+
+For each simulation, AudioGenerator:
+
+1. Selects the requested number of speakers from the available LibriSpeech
+   speaker directories.
+2. Repeatedly chooses an audio file for the active speaker.
+3. Places that audio file at the current time position.
+4. Alternates the active speaker until the requested duration is reached.
+5. Truncates the final segment if it would exceed 60 seconds.
+6. Returns one signal array per speaker and speech metadata.
+
+The RoomSimulator then creates a rectangular room with:
+
+- dimensions 4 m x 6 m;
+- the selected wall absorption coefficient;
+- maximum reflection order 10;
+- one source position per speaker;
+- an optional noise source;
+- three microphones arranged in a circle with a 10 cm radius.
+
+After simulation, the microphone signals are normalized by the largest
+absolute sample value across the complete microphone array. The normalized
+signals are then written as individual files and as one multichannel file.
+
+
+3. GENERATED DATASET STRUCTURE
+------------------------------
+
+The output has this structure:
+
+dataset/
+├── case_0/
+│   ├── sim_0/
+│   │   ├── speaker_1_<speaker_id>.wav
+│   │   ├── speaker_2_<speaker_id>.wav
+│   │   ├── noise_fan.wav              (if noise is enabled)
+│   │   ├── mixture_mic_1.wav
+│   │   ├── mixture_mic_2.wav
+│   │   ├── mixture_mic_3.wav
+│   │   ├── mixture_mic_all.wav
+│   │   └── metadata.json
+│   ├── sim_1/
+│   └── ...
+├── case_1/
+└── ...
+
+There are normally 12 case directories and 10 simulation directories per
+case, giving 120 simulations in total.
+
+The number of speaker files depends on the case:
+
+- two-speaker cases contain two speaker WAV files;
+- three-speaker cases contain three speaker WAV files.
+
+All generated WAV signals have a nominal sample rate of 16,000 Hz and a
+duration of 60 seconds.
+
+
+4. AUDIO FILES
+--------------
+
+speaker_<number>_<speaker_id>.wav
+    One source signal for one selected speaker. The signal is mostly silent
+    while another speaker is active. These are the raw source tracks used as
+    inputs to the room simulator.
+
+noise_fan.wav
+    The fan-noise signal used as an additional source when noise is enabled.
+    It is repeated and cropped to exactly the requested duration.
+
+mixture_mic_1.wav
+mixture_mic_2.wav
+mixture_mic_3.wav
+    The simulated recording from one virtual microphone. Each file contains
+    one channel.
+
+mixture_mic_all.wav
+    A multichannel WAV file containing all three microphone signals. Channel
+    1 corresponds to mixture_mic_1.wav, channel 2 to mixture_mic_2.wav, and
+    channel 3 to mixture_mic_3.wav. This file is written by transposing the
+    internal array from (microphones, samples) to (samples, microphones),
+    which is the layout expected by soundfile for multichannel audio.
+
+
+5. METADATA.JSON
+----------------
+
+Each sim_N directory has its own metadata.json file. The metadata combines
+information returned by the speech generator with information about the
+noise and room configuration.
+
+track_id
+    A unique identifier generated for the speech track, such as
+    track_9d5cefd1. It identifies the generated source-track set.
+
+total_duration_sec
+    Requested duration of every source track, normally 60 seconds.
+
+speakers_count
+    Number of selected speakers for this simulation: 2 or 3.
+
+speakers
+    List of selected LibriSpeech speaker directory identifiers.
+
+normalize_audio
+    Configuration flag returned by AudioGenerator. It records whether audio
+    normalization was requested. The current generation path stores this
+    flag, while the source tracks are written without an additional
+    per-track normalization step.
+
+audios
+    List describing the source WAV files. Each item contains:
+
+    speaker_index
+        One-based index of the source track.
+
+    speaker_id
+        LibriSpeech speaker identifier.
+
+    file_name
+        Name of the corresponding source WAV file in the same sim_N directory.
+
+    duration_sec
+        Duration assigned to that source track.
+
+timeline_segments
+    Chronological list of speech segments placed into the source tracks.
+    Each segment contains:
+
+    speaker_index
+        Source track that contains the segment.
+
+    speaker_id
+        LibriSpeech speaker identifier.
+
+    audio_file
+        Original LibriSpeech FLAC filename selected for the segment.
+
+    text
+        Transcript read from the corresponding .trans.txt file, when found.
+
+    start_time_sec
+        Segment start time in the generated 60-second track.
+
+    end_time_sec
+        Segment end time in the generated track.
+
+    duration_sec
+        Segment duration.
+
+noise_metadata
+    Description of the generated noise:
+
+    noise_type
+        Noise source name, normally fan.
+
+    duration_sec
+        Noise duration.
+
+    sample_rate
+        Noise sample rate, normally 16000 Hz.
+
+    file_name
+        Expected noise filename, normally noise_fan.wav.
+
+absorbtion
+    Wall absorption coefficient used by the room simulator. The key is
+    currently misspelled as "absorbtion" in the generated JSON; valid values
+    are 0.1, 0.2, or 0.3.
+
+noise
+    Boolean indicating whether the noise source was included in the room
+    simulation. When false, noise_fan.wav is not written and the noise signal
+    is not passed to the room simulator.
+
+
+6. IMPORTANT INTERPRETATION NOTES
+----------------------------------
+
+- The raw speaker WAV files are source signals before room propagation.
+- The mixture microphone WAV files are simulated recordings after room
+  propagation, reflections, and optional noise.
+- The microphone signals are normalized before being saved.
+- The source signals are not mixed together directly in the files; the
+  mixing is performed by the room simulator.
+- Metadata is stored separately inside each simulation directory, so every
+  simulation is self-describing.
+- The same generated fan-noise array is reused across all noise-enabled
+  simulations in one execution, while its room contribution still depends
+  on the absorption, speaker count, and room simulation.
