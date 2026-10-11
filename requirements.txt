@@ -1,0 +1,5 @@
+librosa>=1.0.0
+matplotlib>=3.11.2
+numpy
+pyroomacoustics>=0.10.1
+soundfile
