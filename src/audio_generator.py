@@ -79,11 +79,11 @@ class AudioGenerator:
             np.zeros(total_samples, dtype=np.float32) for _ in range(n_speakers)
         ]
 
-        current_time = 0.0
+        current_time = 3.0
         speaker_idx = 0
         segments_info = []
 
-        while current_time < target_duration_sec:
+        while current_time < target_duration_sec - 3:
             active_idx = speaker_idx % n_speakers
             speaker_id = selected_speakers[active_idx]
             speaker_path = os.path.join(self.raw_path, speaker_id)
@@ -100,39 +100,36 @@ class AudioGenerator:
             audio_data, _ = librosa.load(audio_file, sr=sr)
             duration = librosa.get_duration(y=audio_data, sr=sr)
 
-            if current_time + duration > target_duration_sec:
-                duration = target_duration_sec - current_time
-                max_samples_clip = int(duration * sr)
-                audio_data = audio_data[:max_samples_clip]
+            if current_time + duration < target_duration_sec :
 
-            start_sample = int(current_time * sr)
-            end_sample = start_sample + len(audio_data)
+                start_sample = int(current_time * sr)
+                end_sample = start_sample + len(audio_data)
 
-            audio_tracks[active_idx][start_sample:end_sample] = audio_data
+                audio_tracks[active_idx][start_sample:end_sample] = audio_data
 
-            chapter_dir = os.path.dirname(audio_file)
-            trans_files = glob.glob(os.path.join(chapter_dir, "*.trans.txt"))
+                chapter_dir = os.path.dirname(audio_file)
+                trans_files = glob.glob(os.path.join(chapter_dir, "*.trans.txt"))
 
-            speech_text = ""
-            if trans_files:
-                transcripts = self._load_transcripts(trans_files[0])
-                utt_id = os.path.splitext(os.path.basename(audio_file))[0]
-                speech_text = transcripts.get(utt_id, "")
+                speech_text = ""
+                if trans_files:
+                    transcripts = self._load_transcripts(trans_files[0])
+                    utt_id = os.path.splitext(os.path.basename(audio_file))[0]
+                    speech_text = transcripts.get(utt_id, "")
 
-            segments_info.append(
-                {
-                    "speaker_index": active_idx + 1,
-                    "speaker_id": speaker_id,
-                    "audio_file": os.path.basename(audio_file),
-                    "text": speech_text,
-                    "start_time_sec": round(current_time, 2),
-                    "end_time_sec": round(current_time + duration, 2),
-                    "duration_sec": round(duration, 2),
-                }
-            )
+                segments_info.append(
+                    {
+                        "speaker_index": active_idx + 1,
+                        "speaker_id": speaker_id,
+                        "audio_file": os.path.basename(audio_file),
+                        "text": speech_text,
+                        "start_time_sec": round(current_time, 2),
+                        "end_time_sec": round(current_time + duration, 2),
+                        "duration_sec": round(duration, 2),
+                    }
+                )
 
-            current_time += duration
-            speaker_idx += 1
+                current_time += duration
+                speaker_idx += 1
 
         files_metadata = []
         for i, speaker_id in enumerate(selected_speakers, start=1):
