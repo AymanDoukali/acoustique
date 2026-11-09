@@ -2,4 +2,6 @@
 __pycache__/
 
 data/raw
-data/generated
+data/generated/dataset
+data/generated/speech
+data/generated/transcript
