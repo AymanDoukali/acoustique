@@ -1,9 +1,10 @@
-"""Diagnostic : pourquoi les SNR des trois micros sont-ils identiques ?
+"""Diagnostic : les SNR des micros sont-ils différents, et les sorties du modèle aussi ?
 
-Compare les canaux ORIGINAUX puis les canaux AMÉLIORÉS (mêmes modèles que le
-pipeline) : corrélation, écart relatif, puissances de bruit, SNR par fenêtre.
+Compare les canaux ORIGINAUX puis les sorties AMÉLIORÉES du modèle choisi :
+corrélation, écart relatif, puissances de bruit, SNR par fenêtre.
 
     python diagnose_channels.py data/generated/dataset/case_0/sim_0/mixture_mic_all.wav
+    python diagnose_channels.py <fichier.wav> --model mvdr
 """
 
 from __future__ import annotations
@@ -21,7 +22,13 @@ from channel_selection import (
     estimate_noise_power,
     stack_signals,
 )
-from speech_enhancement import DEFAULT_MODEL_TAG, N_MICS, build_enhancers, enhance_all
+from speech_enhancement import (
+    DEFAULT_MODEL,
+    MODELS,
+    N_MICS,
+    build_enhancers,
+    enhance_all,
+)
 
 
 def report(title: str, signals, cfg: SelectionConfig) -> None:
@@ -31,14 +38,18 @@ def report(title: str, signals, cfg: SelectionConfig) -> None:
 
     print("\n" + "=" * 70 + f"\n{title}\n" + "=" * 70)
     for m in range(x.shape[0]):
-        print(f"Mic {m} | puissance totale={np.mean(x[m] ** 2):.4e} "
+        print(f"Sortie {m} | puissance totale={np.mean(x[m] ** 2):.4e} "
               f"| puissance bruit (0-{cfg.noise_duration:.0f}s)={noise_power[m]:.4e}")
 
-    print("\nSimilarité entre canaux (relative_rms_diff ~ 0 => canaux identiques) :")
-    for s in channel_similarity(signals):
-        i, j = s["pair"]
-        print(f"  Mic {i} vs {j} | corr={s['correlation']:.6f} "
-              f"| écart RMS relatif={s['relative_rms_diff']:.4e}")
+    if x.shape[0] == 1:
+        print("\nUne seule sortie : ce modèle combine les micros, "
+              "il n'y a pas de comparaison entre canaux.")
+    else:
+        print("\nSimilarité entre canaux (relative_rms_diff ~ 0 => canaux identiques) :")
+        for s in channel_similarity(signals):
+            i, j = s["pair"]
+            print(f"  Sortie {i} vs {j} | corr={s['correlation']:.6f} "
+                  f"| écart RMS relatif={s['relative_rms_diff']:.4e}")
 
     print("\nSNR (dB) par fenêtre, après le bruit seul :")
     with np.printoptions(precision=3, suppress=True):
@@ -51,7 +62,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("input", type=Path)
-    parser.add_argument("--model-tag", default=DEFAULT_MODEL_TAG)
+    parser.add_argument("--model", choices=sorted(MODELS), default=DEFAULT_MODEL)
     args = parser.parse_args()
 
     audio, fs = sf.read(args.input, dtype="float32")
@@ -61,8 +72,9 @@ def main() -> None:
 
     report("SIGNAUX ORIGINAUX", [audio[:, m] for m in range(N_MICS)], cfg)
 
-    enhancers = build_enhancers(args.model_tag)
-    report("SIGNAUX AMÉLIORÉS", enhance_all(enhancers, audio, fs), cfg)
+    enhancers = build_enhancers(MODELS[args.model])
+    report(f"SORTIES AMÉLIORÉES (modèle {args.model})",
+           enhance_all(enhancers, audio, fs), cfg)
 
 
 if __name__ == "__main__":
