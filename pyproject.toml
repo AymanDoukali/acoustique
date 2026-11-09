@@ -1,9 +1,20 @@
 [project]
 name = "acoustique"
 version = "0.1.0"
+description = "Simulation acoustique multi-microphones et evaluation WER"
 requires-python = ">=3.12"
 dependencies = [
-    "librosa>=1.0.0",
-    "matplotlib>=3.11.2",
-    "pyroomacoustics>=0.10.1",
+  "librosa>=1.0.0",
+  "matplotlib>=3.11.2",
+  "pyroomacoustics>=0.10.1",
+  "numpy>=1.26",
+  "scipy>=1.12",
+  "soundfile>=0.12",
+  "jiwer>=3.0",
 ]
+
+[project.optional-dependencies]
+speech = ["espnet", "espnet_model_zoo", "torch", "torchaudio"]
+
+[tool.uv]
+package = false
